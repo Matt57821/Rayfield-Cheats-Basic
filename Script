@@ -1,0 +1,482 @@
+-- Rayfield-based "Hacking Sim" UI for Roblox Studio (Local only)
+-- Put this LocalScript in StarterPlayer -> StarterPlayerScripts
+-- INTENDED FOR STUDIO / TEST PLACES ONLY. -- (no)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Load Rayfield (from your provided file snippet)
+local success, Rayfield = pcall(function()
+    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+end)
+if not success or not Rayfield then
+    warn("Failed to load Rayfield. Make sure HttpGet works or provide Rayfield locally.")
+    return
+end
+
+-- Create Window with configuration saving enabled
+local Window = Rayfield:CreateWindow({
+    Name = "Hacking Sim (Studio)",
+    LoadingTitle = "Hacking Sim Interface",
+    LoadingSubtitle = "Local/Test Only",
+    ToggleUIKeybind = "K",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "HackingSimConfigs", -- customize
+        FileName = "DefaultConfig"
+    },
+    DisableRayfieldPrompts = true
+})
+
+-- Helper: get local character and humanoid
+local function getCharacter()
+    return LocalPlayer.Character
+end
+local function getHumanoid()
+    local char = getCharacter()
+    if char then
+        return char:FindFirstChildOfClass("Humanoid")
+    end
+    return nil
+end
+
+-- ===== Main Tab =====
+local mainTab = Window:CreateTab("Main", "zap")
+local mainSection = mainTab:CreateSection("Player Movement & Utilities")
+
+-- Speed slider + toggle
+local speedToggle
+local speedSlider = mainTab:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {0, 500},
+    Increment = 1,
+    Suffix = "WS",
+    CurrentValue = 16,
+    Flag = "SpeedSlider",
+    Callback = function(val)
+        if speedToggle and speedToggle.CurrentValue then
+            local hum = getHumanoid()
+            if hum then hum.WalkSpeed = val end
+        end
+    end
+})
+speedToggle = mainTab:CreateToggle({
+    Name = "Enable Speed",
+    CurrentValue = false,
+    Flag = "SpeedToggle",
+    Callback = function(on)
+        local hum = getHumanoid()
+        if on then
+            if hum then hum.WalkSpeed = speedSlider.CurrentValue end
+        else
+            if hum then hum.WalkSpeed = 16 end -- default fallback
+        end
+    end
+})
+
+-- Jump power slider + toggle
+local jumpToggle
+local jumpSlider = mainTab:CreateSlider({
+    Name = "JumpPower",
+    Range = {0, 500},
+    Increment = 1,
+    Suffix = "JP",
+    CurrentValue = 50,
+    Flag = "JumpSlider",
+    Callback = function(val)
+        if jumpToggle and jumpToggle.CurrentValue then
+            local hum = getHumanoid()
+            if hum then hum.JumpPower = val end
+        end
+    end
+})
+jumpToggle = mainTab:CreateToggle({
+    Name = "Enable JumpPower",
+    CurrentValue = false,
+    Flag = "JumpToggle",
+    Callback = function(on)
+        local hum = getHumanoid()
+        if on then
+            if hum then hum.JumpPower = jumpSlider.CurrentValue end
+        else
+            if hum then hum.JumpPower = 50 end
+        end
+    end
+})
+
+-- Infinite Jump
+local infiniteJumpToggle = mainTab:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Flag = "InfiniteJump",
+    Callback = function(on)
+        -- handled below with input connection
+    end
+})
+
+-- Noclip (sets CanCollide = false on character parts while enabled)
+local noclipToggle = mainTab:CreateToggle({
+    Name = "Noclip",
+    CurrentValue = false,
+    Flag = "Noclip",
+    Callback = function(on)
+        -- handled by RunService loop below
+    end
+})
+
+-- Infinite health (keep health at max)
+local infiniteHealthToggle = mainTab:CreateToggle({
+    Name = "Infinite Health",
+    CurrentValue = false,
+    Flag = "InfiniteHealth",
+    Callback = function(on)
+        -- handled by RunService loop below
+    end
+})
+
+-- Anti-AFK Toggle (simple simulated input)
+local antiAfkToggle = mainTab:CreateToggle({
+    Name = "Anti-AFK",
+    CurrentValue = true,
+    Flag = "AntiAFK",
+    Callback = function(on)
+        -- handled by small simulated input below
+    end
+})
+
+-- ===== Teleport Tab =====
+local teleportTab = Window:CreateTab("Teleport", "map-pin")
+local teleportSection = teleportTab:CreateSection("Teleport Tools")
+
+-- Dropdown for players (single select)
+local function getPlayerNames()
+    local names = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(names, p.Name)
+        end
+    end
+    return names
+end
+local teleportDropdown = teleportTab:CreateDropdown({
+    Name = "Teleport Target",
+    Options = getPlayerNames(),
+    CurrentOption = {},
+    MultipleOptions = false,
+    Flag = "TeleportDropdown",
+    Callback = function(options)
+        -- nothing special
+    end
+})
+
+-- Teleport toggle: while enabled, teleport local character to target's HumanoidRootPart every frame
+local teleportToggle = teleportTab:CreateToggle({
+    Name = "Enable Teleporting",
+    CurrentValue = false,
+    Flag = "TeleportToggle",
+    Callback = function(on)
+        -- loop handled below
+    end
+})
+
+-- Refresh dropdown when players join/leave
+Players.PlayerAdded:Connect(function()
+    teleportDropdown:Refresh(getPlayerNames())
+end)
+Players.PlayerRemoving:Connect(function()
+    teleportDropdown:Refresh(getPlayerNames())
+end)
+
+-- ===== Fighting Tab =====
+local fightTab = Window:CreateTab("Fighting", "target")
+local fightSection = fightTab:CreateSection("Combat Tools")
+
+local aimbotToggle = fightTab:CreateToggle({
+    Name = "Aimbot (Local Test Only)",
+    CurrentValue = false,
+    Flag = "AimbotToggle",
+    Callback = function(on)
+        -- handled by RunService loop below
+    end
+})
+
+local aimbotTargetDropdown = fightTab:CreateDropdown({
+    Name = "Aimbot Target Part",
+    Options = {"Head","HumanoidRootPart","Torso"},
+    CurrentOption = {"Head"},
+    MultipleOptions = false,
+    Flag = "AimbotTargetPart",
+    Callback = function(opt) end
+})
+
+local espToggle = fightTab:CreateToggle({
+    Name = "ESP",
+    CurrentValue = false,
+    Flag = "ESPToggle",
+    Callback = function(on)
+        -- handled below
+    end
+})
+local espColorPicker = fightTab:CreateColorPicker({
+    Name = "ESP Color",
+    Color = Color3.fromRGB(255,0,0),
+    Flag = "ESPColor",
+    Callback = function(col) end
+})
+
+-- ===== Settings Tab =====
+local settingsTab = Window:CreateTab("Settings", "sliders")
+local settingsSection = settingsTab:CreateSection("Saved Settings")
+-- Per your note: "just in file i send to you" — we already enabled ConfigurationSaving at CreateWindow above.
+settingsTab:CreateLabel("Configuration saving is enabled. Use Rayfield's config menu to save/load.")
+
+-- ===== Keybinds Tab =====
+local keybindsTab = Window:CreateTab("Keybinds", "keyboard")
+local keybindsSection = keybindsTab:CreateSection("Keybinds")
+
+-- Create keybinds for main toggles (defaults can be changed via UI)
+local kb_speed = keybindsTab:CreateKeybind({
+    Name = "Toggle Speed",
+    CurrentKeybind = "F",
+    HoldToInteract = false,
+    Flag = "KB_Speed",
+    Callback = function(held)
+        -- toggle speed on key press
+        if not held then speedToggle:Set(not speedToggle.CurrentValue) end
+    end
+})
+local kb_jump = keybindsTab:CreateKeybind({
+    Name = "Toggle JumpPower",
+    CurrentKeybind = "G",
+    HoldToInteract = false,
+    Flag = "KB_Jump",
+    Callback = function(held)
+        if not held then jumpToggle:Set(not jumpToggle.CurrentValue) end
+    end
+})
+local kb_infJump = keybindsTab:CreateKeybind({
+    Name = "Toggle InfiniteJump",
+    CurrentKeybind = "H",
+    HoldToInteract = false,
+    Flag = "KB_InfJump",
+    Callback = function(held)
+        if not held then infiniteJumpToggle:Set(not infiniteJumpToggle.CurrentValue) end
+    end
+})
+local kb_noclip = keybindsTab:CreateKeybind({
+    Name = "Toggle Noclip",
+    CurrentKeybind = "J",
+    HoldToInteract = false,
+    Flag = "KB_Noclip",
+    Callback = function(held)
+        if not held then noclipToggle:Set(not noclipToggle.CurrentValue) end
+    end
+})
+local kb_tele = keybindsTab:CreateKeybind({
+    Name = "Toggle Teleport",
+    CurrentKeybind = "T",
+    HoldToInteract = false,
+    Flag = "KB_Teleport",
+    Callback = function(held)
+        if not held then teleportToggle:Set(not teleportToggle.CurrentValue) end
+    end
+})
+
+-- ===== Backend logic & loops =====
+
+-- Infinite jump implementation
+local jumpConnection
+jumpConnection = UserInputService.JumpRequest:Connect(function()
+    if infiniteJumpToggle and infiniteJumpToggle.CurrentValue then
+        local hum = getHumanoid()
+        if hum then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+-- Noclip implementation
+local noclipEnabled = false
+RunService.Stepped:Connect(function()
+    if noclipToggle and noclipToggle.CurrentValue then
+        local char = getCharacter()
+        if char then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    else
+        -- don't forcibly reset collisions to avoid interfering with normal game logic;
+        -- when disabled, no-op (you can respawn to reset in many cases)
+    end
+end)
+
+-- Infinite health implementation
+RunService.Heartbeat:Connect(function()
+    if infiniteHealthToggle and infiniteHealthToggle.CurrentValue then
+        local hum = getHumanoid()
+        if hum then
+            hum.Health = hum.MaxHealth
+        end
+    end
+end)
+
+-- Anti-AFK: small periodic keypress simulation (studio-safe, non-exploitive)
+-- We'll move the camera slightly then back every 55 seconds while enabled
+spawn(function()
+    while true do
+        if antiAfkToggle and antiAfkToggle.CurrentValue then
+            -- nudge the camera CFrame slightly then restore
+            local cam = workspace.CurrentCamera
+            if cam then
+                local old = cam.CFrame
+                cam.CFrame = old * CFrame.new(0,0.0001,0)
+                wait(0.1)
+                if cam then cam.CFrame = old end
+            end
+        end
+        wait(55)
+    end
+end)
+
+-- Teleport loop
+spawn(function()
+    while true do
+        if teleportToggle and teleportToggle.CurrentValue then
+            local option = teleportDropdown.CurrentOption and teleportDropdown.CurrentOption[1]
+            if option then
+                local target = Players:FindFirstChild(option)
+                local char = getCharacter()
+                if target and target.Character and char and char:FindFirstChild("HumanoidRootPart") and target.Character:FindFirstChild("HumanoidRootPart") then
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    hrp.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
+                end
+            end
+        end
+        RunService.Heartbeat:Wait()
+    end
+end)
+
+-- Aimbot (local test helper): when enabled, slowly rotate camera toward target part when holding right mouse button
+local aiming = false
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = false
+    end
+end)
+
+RunService.Heartbeat:Connect(function(dt)
+    if aimbotToggle and aimbotToggle.CurrentValue and aiming then
+        local option = Players:GetPlayers()
+        -- pick nearest player to center of screen (basic heuristic)
+        local camera = workspace.CurrentCamera
+        local best, bestDist = nil, math.huge
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(tostring(aimbotTargetDropdown.CurrentOption[1] or "Head")) then
+                local part = p.Character[aimbotTargetDropdown.CurrentOption[1] or "Head"]
+                local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
+                if onScreen then
+                    local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                    if dist < bestDist then
+                        bestDist = dist
+                        best = part
+                    end
+                end
+            end
+        end
+        if best and camera then
+            -- smooth camera lookAt (studio-only; will not affect other players)
+            local desiredCFrame = CFrame.new(camera.CFrame.Position, best.Position)
+            camera.CFrame = camera.CFrame:Lerp(desiredCFrame, math.clamp(5 * dt, 0, 1))
+        end
+    end
+end)
+
+-- Simple ESP: create a BillboardGui for each other player
+local espGuis = {}
+local function applyESPToPlayer(p)
+    if espGuis[p] then return end
+    if not p.Character then return end
+    local root = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChildWhichIsA("BasePart")
+    if not root then return end
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "HackingSimESP"
+    billboard.AlwaysOnTop = true
+    billboard.Size = UDim2.new(0,100,0,40)
+    billboard.Adornee = root
+    billboard.ResetOnSpawn = false
+
+    local text = Instance.new("TextLabel", billboard)
+    text.Size = UDim2.new(1,0,1,0)
+    text.BackgroundTransparency = 1
+    text.TextScaled = true
+    text.TextStrokeTransparency = 0.5
+    text.Text = p.Name
+    text.Font = Enum.Font.SourceSansBold
+
+    billboard.Parent = workspace.CurrentCamera -- keep in camera so it's not replicated
+    espGuis[p] = billboard
+end
+local function removeESPFromPlayer(p)
+    if espGuis[p] then
+        espGuis[p]:Destroy()
+        espGuis[p] = nil
+    end
+end
+
+-- update ESP color when color picker changes
+espColorPicker.Callback = function(col)
+    for p,g in pairs(espGuis) do
+        local lbl = g:FindFirstChildOfClass("TextLabel")
+        if lbl then
+            lbl.TextColor3 = col
+        end
+    end
+end
+
+-- enable/disable ESP
+espToggle.Callback = function(on)
+    if on then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then applyESPToPlayer(p) end
+        end
+    else
+        for p in pairs(espGuis) do
+            removeESPFromPlayer(p)
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(function(p)
+    if espToggle and espToggle.CurrentValue and p ~= LocalPlayer then
+        applyESPToPlayer(p)
+    end
+    -- refresh teleport dropdown (already handled)
+end)
+Players.PlayerRemoving:Connect(function(p)
+    removeESPFromPlayer(p)
+    teleportDropdown:Refresh(getPlayerNames())
+end)
+
+-- ensure existing players ESP applied if toggled on at load
+if espToggle and espToggle.CurrentValue then
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then applyESPToPlayer(p) end
+    end
+end
+
+-- Finalize: Load saved config (Rayfield config)
+Rayfield:LoadConfiguration() -- loads the saved values for flags we used above
+
+-- End of script
