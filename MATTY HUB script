@@ -1,7 +1,5 @@
--- Matty Hub 
--- Full LocalScript
+-- Matty Hub - Full LocalScript Fixed
 -- Rayfield UI required
--- Work on any games
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -16,14 +14,8 @@ local aimingMouseDown = false
 
 -- Helpers
 local function getCharacter() return LocalPlayer and LocalPlayer.Character end
-local function getHumanoid()
-    local c = getCharacter()
-    return c and c:FindFirstChildOfClass("Humanoid")
-end
-local function getHRP(character)
-    if not character then return nil end
-    return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart")
-end
+local function getHumanoid() local c = getCharacter() return c and c:FindFirstChildOfClass("Humanoid") end
+local function getHRP(character) if not character then return nil end return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart") end
 
 -- Create Rayfield window
 local Window = Rayfield:CreateWindow({
@@ -44,91 +36,55 @@ local mainTab = Window:CreateTab("Main", "zap")
 mainTab:CreateSection("Movement & Utility")
 
 -- WalkSpeed
-local speedSlider = mainTab:CreateSlider({
-    Name = "WalkSpeed", Range = {0, 500}, Increment = 1, Suffix = "WS", CurrentValue = 16,
-    Flag = "SpeedSlider",
-    Callback = function(value) if speedToggle.CurrentValue then getHumanoid().WalkSpeed = value end end
-})
-local speedToggle = mainTab:CreateToggle({
-    Name = "Speed On/Off", CurrentValue = false, Flag = "SpeedToggle",
-    Callback = function(on) local hum = getHumanoid(); if on then hum.WalkSpeed = speedSlider.CurrentValue else hum.WalkSpeed = 16 end end
-})
+local speedSlider = mainTab:CreateSlider({ Name = "WalkSpeed", Range = {0, 500}, Increment = 1, Suffix = "WS", CurrentValue = 16, Flag = "SpeedSlider" })
+local speedToggle = mainTab:CreateToggle({ Name = "Speed On/Off", CurrentValue = false, Flag = "SpeedToggle" })
 
 -- JumpPower
-local jumpSlider = mainTab:CreateSlider({
-    Name = "JumpPower", Range = {0, 500}, Increment = 1, Suffix = "JP", CurrentValue = 50,
-    Flag = "JumpSlider",
-    Callback = function(value) if jumpToggle.CurrentValue then getHumanoid().JumpPower = value end end
-})
-local jumpToggle = mainTab:CreateToggle({
-    Name = "JumpPower On/Off", CurrentValue = false, Flag = "JumpToggle",
-    Callback = function(on) local hum = getHumanoid(); if on then hum.JumpPower = jumpSlider.CurrentValue else hum.JumpPower = 50 end end
-})
+local jumpSlider = mainTab:CreateSlider({ Name = "JumpPower", Range = {0, 500}, Increment = 1, Suffix = "JP", CurrentValue = 50, Flag = "JumpSlider" })
+local jumpToggle = mainTab:CreateToggle({ Name = "JumpPower On/Off", CurrentValue = false, Flag = "JumpToggle" })
+
+-- Functions to apply speed/jump
+local function applySpeed() local hum = getHumanoid() if hum and speedToggle.CurrentValue then hum.WalkSpeed = speedSlider.CurrentValue end end
+local function applyJump() local hum = getHumanoid() if hum and jumpToggle.CurrentValue then hum.JumpPower = jumpSlider.CurrentValue end end
+
+speedToggle.Callback = function() applySpeed() end
+speedSlider.Callback = function() applySpeed() end
+jumpToggle.Callback = function() applyJump() end
+jumpSlider.Callback = function() applyJump() end
+
+-- Reapply on respawn
+LocalPlayer.CharacterAdded:Connect(function(char) char:WaitForChild("Humanoid") task.wait(0.1) applySpeed() applyJump() end)
 
 -- Infinite Jump
 local infJumpToggle = mainTab:CreateToggle({ Name = "Infinite Jump", CurrentValue = false, Flag = "InfJump" })
-UserInputService.JumpRequest:Connect(function()
-    if infJumpToggle.CurrentValue then
-        local hum = getHumanoid()
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-    end
-end)
+UserInputService.JumpRequest:Connect(function() if infJumpToggle.CurrentValue then local hum = getHumanoid() if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end end end)
 
 -- Noclip
 local noclipToggle = mainTab:CreateToggle({ Name = "Noclip", CurrentValue = false, Flag = "Noclip" })
-RunService.Stepped:Connect(function()
-    if noclipToggle.CurrentValue then
-        local char = getCharacter()
-        if char then for _, part in pairs(char:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = false end end end
-    end
-end)
+RunService.Stepped:Connect(function() if noclipToggle.CurrentValue then local char = getCharacter() if char then for _, part in pairs(char:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = false end end end end end)
 
 -- Infinite Health
 local infHealthToggle = mainTab:CreateToggle({ Name = "Infinite Health", CurrentValue = false, Flag = "InfiniteHealth" })
-RunService.Heartbeat:Connect(function()
-    if infHealthToggle.CurrentValue then local hum = getHumanoid(); if hum then hum.Health = hum.MaxHealth end end
-end)
+RunService.Heartbeat:Connect(function() if infHealthToggle.CurrentValue then local hum = getHumanoid() if hum then hum.Health = hum.MaxHealth end end end)
 
 -- Anti-AFK
 local antiAfkToggle = mainTab:CreateToggle({ Name = "Anti-AFK", CurrentValue = true, Flag = "AntiAFK" })
-spawn(function()
-    while true do
-        if antiAfkToggle.CurrentValue then
-            local cam = workspace.CurrentCamera
-            if cam then local old = cam.CFrame cam.CFrame = old * CFrame.new(0,0.0001,0) task.wait(0.12) cam.CFrame = old end
-        end
-        task.wait(55)
-    end
-end)
+spawn(function() while true do if antiAfkToggle.CurrentValue then local cam = workspace.CurrentCamera if cam then local old = cam.CFrame cam.CFrame = old * CFrame.new(0,0.0001,0) task.wait(0.12) cam.CFrame = old end end task.wait(55) end end)
 
 -- ======= Teleport Tab =======
 local teleportTab = Window:CreateTab("Teleport", "map-pin")
 teleportTab:CreateSection("Teleport Tools")
 
-local function playerListExceptLocal()
-    local out = {}
-    for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(out, p.Name) end end
-    if #out == 0 then table.insert(out, "No Players") end
-    return out
-end
+local function playerListExceptLocal() local out = {} for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(out, p.Name) end end if #out==0 then table.insert(out,"No Players") end return out end
 
-local tpDropdown = teleportTab:CreateDropdown({
-    Name = "Teleport Target", Options = playerListExceptLocal(), CurrentOption = {}, MultipleOptions = false, Flag = "TeleportDropdown"
-})
-local tpButton = teleportTab:CreateButton({
-    Name = "Teleport To Player",
-    Callback = function()
-        local opt = tpDropdown.CurrentOption[1]
-        if not opt or opt == "No Players" then Rayfield:Notify({Title="Teleport", Content="No target selected.", Duration=3}); return end
-        local target = Players:FindFirstChild(opt)
-        if target and target.Character and getHRP(target.Character) and getHRP(getCharacter()) then
-            getHRP(getCharacter()).CFrame = getHRP(target.Character).CFrame + Vector3.new(0,3,0)
-            Rayfield:Notify({Title="Teleport", Content="Teleported to "..opt, Duration=2})
-        else
-            Rayfield:Notify({Title="Teleport", Content="Target unavailable.", Duration=3})
-        end
-    end
-})
+local tpDropdown = teleportTab:CreateDropdown({ Name = "Teleport Target", Options = playerListExceptLocal(), CurrentOption = {}, MultipleOptions = false, Flag = "TeleportDropdown" })
+local tpButton = teleportTab:CreateButton({ Name = "Teleport To Player", Callback = function()
+    local opt = tpDropdown.CurrentOption[1]
+    if not opt or opt=="No Players" then Rayfield:Notify({Title="Teleport", Content="No target selected.", Duration=3}); return end
+    local target = Players:FindFirstChild(opt)
+    if target and target.Character and getHRP(target.Character) and getHRP(getCharacter()) then getHRP(getCharacter()).CFrame = getHRP(target.Character).CFrame + Vector3.new(0,3,0) Rayfield:Notify({Title="Teleport", Content="Teleported to "..opt, Duration=2})
+    else Rayfield:Notify({Title="Teleport", Content="Target unavailable.", Duration=3}) end
+end})
 Players.PlayerAdded:Connect(function() tpDropdown:Refresh(playerListExceptLocal()) end)
 Players.PlayerRemoving:Connect(function() tpDropdown:Refresh(playerListExceptLocal()) end)
 
@@ -136,139 +92,35 @@ Players.PlayerRemoving:Connect(function() tpDropdown:Refresh(playerListExceptLoc
 local fightTab = Window:CreateTab("Fighting", "target")
 fightTab:CreateSection("Combat Tools")
 
--- Aimbot Toggle
 local aimbotToggle = fightTab:CreateToggle({ Name = "Aimbot", CurrentValue = false, Flag = "AimbotToggle" })
-local function currentPlayerNames()
-    local names = {}
-    for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(names, p.Name) end end
-    if #names == 0 then table.insert(names, "No Players") end
-    return names
-end
-local aimbotTargetDropdown = fightTab:CreateDropdown({
-    Name = "Aimbot Target Player", Options = currentPlayerNames(), CurrentOption = {}, MultipleOptions = false, Flag = "AimbotTargetPlayer"
-})
-Players.PlayerAdded:Connect(function(p)
-    aimbotTargetDropdown:Refresh(currentPlayerNames())
-end)
-Players.PlayerRemoving:Connect(function(p)
-    aimbotTargetDropdown:Refresh(currentPlayerNames())
-    if aimbotTargetDropdown.CurrentOption[1] == p.Name then aimbotTargetDropdown:Set({}) end
-end)
+local function currentPlayerNames() local names = {} for _, p in ipairs(Players:GetPlayers()) do if p~=LocalPlayer then table.insert(names,p.Name) end end if #names==0 then table.insert(names,"No Players") end return names end
+local aimbotTargetDropdown = fightTab:CreateDropdown({ Name = "Aimbot Target Player", Options = currentPlayerNames(), CurrentOption = {}, MultipleOptions = false, Flag = "AimbotTargetPlayer" })
+Players.PlayerAdded:Connect(function(p) aimbotTargetDropdown:Refresh(currentPlayerNames()) end)
+Players.PlayerRemoving:Connect(function(p) aimbotTargetDropdown:Refresh(currentPlayerNames()) if aimbotTargetDropdown.CurrentOption[1]==p.Name then aimbotTargetDropdown:Set({}) end end)
 
--- ESP
+-- ======= ESP =======
 local espToggle = fightTab:CreateToggle({ Name = "ESP (Highlight + Name)", CurrentValue = false, Flag = "ESPToggle" })
 local espColorPicker = fightTab:CreateColorPicker({ Name = "ESP Color", Color = Color3.fromRGB(255,0,0), Flag = "ESPColor" })
-
 local espTracks = {}
-local function createNameBillboard(p)
-    if not p.Character then return nil end
-    local root = getHRP(p.Character)
-    if not root then return nil end
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "MattyESPName"
-    billboard.Adornee = root
-    billboard.AlwaysOnTop = true
-    billboard.Size = UDim2.new(0,150,0,30)
-    billboard.StudsOffset = Vector3.new(0, 3.5, 0)
-    billboard.ResetOnSpawn = false
-    billboard.Parent = workspace.CurrentCamera
-    local label = Instance.new("TextLabel", billboard)
-    label.Size = UDim2.new(1,0,1,0)
-    label.BackgroundTransparency = 1
-    label.Text = p.Name
-    label.TextScaled = true
-    label.Font = Enum.Font.SourceSansBold
-    label.TextStrokeTransparency = 0.6
-    label.TextColor3 = espColorPicker.Color
-    return billboard
-end
-local function applyESP(p)
-    if p == LocalPlayer or espTracks[p] then return end
-    if not p.Character then return end
-    local hl = Instance.new("Highlight")
-    hl.Name = "MattyESPHighlight"
-    hl.Adornee = p.Character
-    hl.FillTransparency = 0.6
-    hl.OutlineTransparency = 0.6
-    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    hl.FillColor = espColorPicker.Color
-    hl.OutlineColor = espColorPicker.Color
-    hl.Parent = workspace
-    local bb = createNameBillboard(p)
-    espTracks[p] = {highlight=hl,billboard=bb}
-end
-local function removeESP(p)
-    local t = espTracks[p]
-    if not t then return end
-    if t.highlight then pcall(function() t.highlight:Destroy() end) end
-    if t.billboard then pcall(function() t.billboard:Destroy() end) end
-    espTracks[p] = nil
-end
-
-espToggle.Callback = function(on)
-    if on then for _, p in ipairs(Players:GetPlayers()) do if p~=LocalPlayer then applyESP(p) end end
-    else for p,_ in pairs(espTracks) do removeESP(p) end end
-end
-espColorPicker.Callback = function(col)
-    for _, t in pairs(espTracks) do
-        if t.highlight then t.highlight.FillColor = col; t.highlight.OutlineColor = col end
-        if t.billboard then t.billboard:FindFirstChildOfClass("TextLabel").TextColor3 = col end
-    end
-end
+local function createNameBillboard(p) if not p.Character then return nil end local root = getHRP(p.Character) if not root then return nil end local billboard = Instance.new("BillboardGui") billboard.Name = "MattyESPName" billboard.Adornee = root billboard.AlwaysOnTop=true billboard.Size=UDim2.new(0,150,0,30) billboard.StudsOffset=Vector3.new(0,3.5,0) billboard.ResetOnSpawn=false billboard.Parent=workspace.CurrentCamera local label = Instance.new("TextLabel", billboard) label.Size=UDim2.new(1,0,1,0) label.BackgroundTransparency=1 label.Text=p.Name label.TextScaled=true label.Font=Enum.Font.SourceSansBold label.TextStrokeTransparency=0.6 label.TextColor3=espColorPicker.Color return billboard end
+local function applyESP(p) if p==LocalPlayer or espTracks[p] then return end if not p.Character then return end local hl=Instance.new("Highlight") hl.Name="MattyESPHighlight" hl.Adornee=p.Character hl.FillTransparency=0.6 hl.OutlineTransparency=0.6 hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop hl.FillColor=espColorPicker.Color hl.OutlineColor=espColorPicker.Color hl.Parent=workspace local bb=createNameBillboard(p) espTracks[p]={highlight=hl,billboard=bb} end
+local function removeESP(p) local t=espTracks[p] if not t then return end if t.highlight then pcall(function() t.highlight:Destroy() end) end if t.billboard then pcall(function() t.billboard:Destroy() end) end espTracks[p]=nil end
+espToggle.Callback=function(on) if on then for _,p in ipairs(Players:GetPlayers()) do if p~=LocalPlayer then applyESP(p) end end else for p,_ in pairs(espTracks) do removeESP(p) end end end
+espColorPicker.Callback=function(col) for _, t in pairs(espTracks) do if t.highlight then t.highlight.FillColor=col t.highlight.OutlineColor=col end if t.billboard then t.billboard:FindFirstChildOfClass("TextLabel").TextColor3=col end end end
 Players.PlayerAdded:Connect(function(p) if espToggle.CurrentValue and p~=LocalPlayer then applyESP(p) end end)
 Players.PlayerRemoving:Connect(function(p) removeESP(p) end)
 
 -- ======= Keybinds Tab =======
-local keybindsTab = Window:CreateTab("Keybinds", "keyboard")
+local keybindsTab = Window:CreateTab("Keybinds","keyboard")
 keybindsTab:CreateSection("Keybinds")
-
-local kb_aim = keybindsTab:CreateKeybind({
-    Name = "Toggle Nearest Aimbot", CurrentKeybind = "I", HoldToInteract = false, Flag = "KB_AimNearest",
-    Callback = function(held) if not held then aimingKeyToggled = not aimingKeyToggled end end
-})
+local kb_aim = keybindsTab:CreateKeybind({ Name = "Toggle Nearest Aimbot", CurrentKeybind = "I", HoldToInteract=false, Flag="KB_AimNearest", Callback=function(held) if not held then aimingKeyToggled=not aimingKeyToggled end end})
 
 -- ======= Aimbot Logic =======
-local function findNearestPlayerToScreenCenter()
-    local cam = workspace.CurrentCamera
-    if not cam then return nil end
-    local best, bestDist = nil, math.huge
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            local part = p.Character:FindFirstChild("Head") or getHRP(p.Character)
-            if part then
-                local screen, on = cam:WorldToViewportPoint(part.Position)
-                if on then
-                    local center = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
-                    local d = (Vector2.new(screen.X, screen.Y) - center).Magnitude
-                    if d < bestDist then bestDist = d; best = p end
-                end
-            end
-        end
-    end
-    return best
-end
-local function getAimbotDropdownPlayer()
-    local opt = aimbotTargetDropdown.CurrentOption[1]
-    if not opt or opt=="No Players" then return nil end
-    return Players:FindFirstChild(opt)
-end
-RunService.Heartbeat:Connect(function(dt)
-    if not workspace.CurrentCamera then return end
-    local cam = workspace.CurrentCamera
-    local shouldAimNearest = aimingKeyToggled
-    local shouldAimDropdown = aimbotToggle.CurrentValue and aimingMouseDown
-    if not shouldAimNearest and not shouldAimDropdown then return end
-    local target = shouldAimNearest and findNearestPlayerToScreenCenter() or getAimbotDropdownPlayer()
-    if target and target.Character then
-        local part = target.Character:FindFirstChild("Head") or getHRP(target.Character)
-        if part then cam.CFrame = cam.CFrame:Lerp(CFrame.new(cam.CFrame.Position, part.Position), math.clamp(10*dt,0,1)) end
-    end
-end)
+local function findNearestPlayerToScreenCenter() local cam=workspace.CurrentCamera if not cam then return nil end local best,bestDist=nil,math.huge for _,p in ipairs(Players:GetPlayers()) do if p~=LocalPlayer and p.Character then local part=p.Character:FindFirstChild("Head") or getHRP(p.Character) if part then local screen,on=cam:WorldToViewportPoint(part.Position) if on then local center=Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2) local d=(Vector2.new(screen.X,screen.Y)-center).Magnitude if d<bestDist then bestDist=d best=p end end end end end return best end
+local function getAimbotDropdownPlayer() local opt=aimbotTargetDropdown.CurrentOption[1] if not opt or opt=="No Players" then return nil end return Players:FindFirstChild(opt) end
+RunService.Heartbeat:Connect(function(dt) if not workspace.CurrentCamera then return end local cam=workspace.CurrentCamera local shouldAimNearest=aimingKeyToggled local shouldAimDropdown=aimbotToggle.CurrentValue and aimingMouseDown if not shouldAimNearest and not shouldAimDropdown then return end local target=shouldAimNearest and findNearestPlayerToScreenCenter() or getAimbotDropdownPlayer() if target and target.Character then local part=target.Character:FindFirstChild("Head") or getHRP(target.Character) if part then cam.CFrame=cam.CFrame:Lerp(CFrame.new(cam.CFrame.Position, part.Position), math.clamp(10*dt,0,1)) end end end)
 
--- Detect dropdown target leaving
-Players.PlayerRemoving:Connect(function(p)
-    if aimbotTargetDropdown.CurrentOption[1] == p.Name then aimbotTargetDropdown:Set({}) end
-end)
+Players.PlayerRemoving:Connect(function(p) if aimbotTargetDropdown.CurrentOption[1]==p.Name then aimbotTargetDropdown:Set({}) end end)
 
 -- Load config
 Rayfield:LoadConfiguration()
