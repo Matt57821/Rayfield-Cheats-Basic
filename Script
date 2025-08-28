@@ -1,26 +1,20 @@
--- Hacking Simulator (Rayfield) - LocalScript (Studio/Test only)
--- Place into StarterPlayer -> StarterPlayerScripts
--- Safety: For Studio / your own places only. Do not use against other people's games.
+-- Matty Hub 
+-- script hub
+-- work in any games
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- Load Rayfield
-local ok, Rayfield = pcall(function()
-    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-end)
-if not ok or not Rayfield then
-    warn("Failed to load Rayfield. Ensure HttpGet is allowed or embed Rayfield locally.")
-    return
-end
+-- Load latest Rayfield
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Predeclare shared state for keybind aiming
-local aimingKeyHeld = false
+-- Shared aimbot state
+local aimingKeyToggled = false
 local aimingMouseDown = false
 
--- Some helper getters
+-- Helpers
 local function getCharacter()
     return LocalPlayer and LocalPlayer.Character
 end
@@ -33,181 +27,25 @@ local function getHRP(character)
     return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart")
 end
 
--- Basic "hacker" theme (default startup)
-local HackerTheme = {
-    TextColor = Color3.fromRGB(240, 240, 240),
-
-    Background = Color3.fromRGB(20, 20, 20),
-    Topbar = Color3.fromRGB(28, 28, 28),
-    Shadow = Color3.fromRGB(10, 10, 10),
-
-    NotificationBackground = Color3.fromRGB(14, 14, 14),
-    NotificationActionsBackground = Color3.fromRGB(230, 230, 230),
-
-    TabBackground = Color3.fromRGB(60, 60, 60),
-    TabStroke = Color3.fromRGB(65, 65, 65),
-    TabBackgroundSelected = Color3.fromRGB(210, 210, 210),
-    TabTextColor = Color3.fromRGB(240, 240, 240),
-    SelectedTabTextColor = Color3.fromRGB(30, 30, 30),
-
-    ElementBackground = Color3.fromRGB(12,12,12),
-    ElementBackgroundHover = Color3.fromRGB(22,22,22),
-    SecondaryElementBackground = Color3.fromRGB(10,10,10),
-    ElementStroke = Color3.fromRGB(40, 40, 40),
-    SecondaryElementStroke = Color3.fromRGB(30, 30, 30),
-            
-    SliderBackground = Color3.fromRGB(0, 170, 0),
-    SliderProgress = Color3.fromRGB(0, 170, 0),
-    SliderStroke = Color3.fromRGB(0, 200, 0),
-
-    ToggleBackground = Color3.fromRGB(10, 10, 10),
-    ToggleEnabled = Color3.fromRGB(0, 255, 150),
-    ToggleDisabled = Color3.fromRGB(100, 100, 100),
-    ToggleEnabledStroke = Color3.fromRGB(0, 200, 120),
-    ToggleDisabledStroke = Color3.fromRGB(125, 125, 125),
-    ToggleEnabledOuterStroke = Color3.fromRGB(60, 60, 60),
-    ToggleDisabledOuterStroke = Color3.fromRGB(40, 40, 40),
-
-    DropdownSelected = Color3.fromRGB(25,25,25),
-    DropdownUnselected = Color3.fromRGB(14,14,14),
-
-    InputBackground = Color3.fromRGB(12,12,12),
-    InputStroke = Color3.fromRGB(40,40,40),
-    PlaceholderColor = Color3.fromRGB(140,140,140)
-}
-
--- Collection of predefined themes (simple variations). You can tweak colors here.
-local Themes = {
-    Default = HackerTheme,
-    AmberGlow = {
-        TextColor = Color3.fromRGB(240,240,240),
-        Background = Color3.fromRGB(22, 16, 7),
-        Topbar = Color3.fromRGB(40, 20, 6),
-        SliderBackground = Color3.fromRGB(255,150,0),
-        SliderProgress = Color3.fromRGB(255,150,0),
-        ToggleEnabled = Color3.fromRGB(255,180,80),
-        ElementBackground = Color3.fromRGB(12,8,3),
-    },
-    Amethyst = {
-        TextColor = Color3.fromRGB(245,240,255),
-        Background = Color3.fromRGB(18,6,30),
-        Topbar = Color3.fromRGB(30,12,50),
-        SliderBackground = Color3.fromRGB(160,32,240),
-        SliderProgress = Color3.fromRGB(160,32,240),
-        ToggleEnabled = Color3.fromRGB(200,80,230),
-    },
-    Bloom = {
-        TextColor = Color3.fromRGB(20,20,20),
-        Background = Color3.fromRGB(240,240,240),
-        Topbar = Color3.fromRGB(255,255,255),
-        SliderBackground = Color3.fromRGB(255,100,140),
-        SliderProgress = Color3.fromRGB(255,100,140),
-        ToggleEnabled = Color3.fromRGB(255,60,100),
-        ElementBackground = Color3.fromRGB(250,250,250),
-    },
-    DarkBlue = {
-        TextColor = Color3.fromRGB(230,240,255),
-        Background = Color3.fromRGB(6,12,28),
-        Topbar = Color3.fromRGB(8,16,36),
-        SliderBackground = Color3.fromRGB(40,120,255),
-        SliderProgress = Color3.fromRGB(40,120,255),
-        ToggleEnabled = Color3.fromRGB(80,180,255),
-    },
-    Green = {
-        TextColor = Color3.fromRGB(230,255,230),
-        Background = Color3.fromRGB(5,18,5),
-        Topbar = Color3.fromRGB(6,24,6),
-        SliderBackground = Color3.fromRGB(0,200,0),
-        SliderProgress = Color3.fromRGB(0,200,0),
-        ToggleEnabled = Color3.fromRGB(0,255,120),
-    },
-    Light = {
-        TextColor = Color3.fromRGB(30,30,30),
-        Background = Color3.fromRGB(245,245,245),
-        Topbar = Color3.fromRGB(230,230,230),
-        SliderBackground = Color3.fromRGB(70,130,180),
-        SliderProgress = Color3.fromRGB(70,130,180),
-        ToggleEnabled = Color3.fromRGB(60,160,140),
-        ElementBackground = Color3.fromRGB(255,255,255),
-    },
-    Ocean = {
-        TextColor = Color3.fromRGB(235,245,250),
-        Background = Color3.fromRGB(6,30,40),
-        Topbar = Color3.fromRGB(6,36,50),
-        SliderBackground = Color3.fromRGB(20,200,180),
-        SliderProgress = Color3.fromRGB(20,200,180),
-        ToggleEnabled = Color3.fromRGB(80,240,200),
-    },
-    Serenity = {
-        TextColor = Color3.fromRGB(230,235,245),
-        Background = Color3.fromRGB(12,20,30),
-        Topbar = Color3.fromRGB(18,28,40),
-        SliderBackground = Color3.fromRGB(120,150,255),
-        SliderProgress = Color3.fromRGB(120,150,255),
-        ToggleEnabled = Color3.fromRGB(160,200,255),
-    }
-}
-
--- Utility to apply theme: tries a few common Rayfield APIs, then falls back to setting Window.Theme if present.
-local function applyThemeByIdentifier(id, window)
-    local themeTable = Themes[id] or Themes.Default
-    local applied = false
-
-    -- try several plausible APIs (some Rayfield forks expose different names)
-    local ok, err
-
-    if window and window.ApplyTheme then
-        ok, err = pcall(function() window:ApplyTheme(themeTable) end)
-        applied = applied or ok
-    end
-
-    if not applied and Rayfield.ApplyTheme then
-        ok, err = pcall(function() Rayfield:ApplyTheme(themeTable) end)
-        applied = applied or ok
-    end
-
-    if not applied and Rayfield.ChangeTheme then
-        ok, err = pcall(function() Rayfield:ChangeTheme(themeTable) end)
-        applied = applied or ok
-    end
-
-    if not applied and Rayfield.Theme then
-        -- try setting global theme directly
-        pcall(function() Rayfield.Theme = themeTable end)
-        applied = true
-    end
-
-    -- last resort: try mutating window.Theme then triggering a repaint (not always available)
-    if not applied and window then
-        pcall(function()
-            window.Theme = themeTable
-            if window.UpdateTheme then window:UpdateTheme() end
-            if window:Refresh then window:Refresh() end
-        end)
-        applied = true
-    end
-
-    return applied
-end
-
 -- Create Rayfield window
 local Window = Rayfield:CreateWindow({
-    Name = "Hacking Sim (Studio)",
-    LoadingTitle = "Hacking Simulator",
-    LoadingSubtitle = "Local / Test Only",
+    Name = "Matty Hub",
+    Icon = 0,
+    LoadingTitle = "Matty Hub",
+    LoadingSubtitle = "Loaded Successfully",
+    ShowText = "Matty Hub",
+    Theme = "Default",
     ToggleUIKeybind = "K",
-    Theme = HackerTheme,
+    DisableRayfieldPrompts = true,
+    DisableBuildWarnings = false,
     ConfigurationSaving = {
         Enabled = true,
-        FolderName = "HackingSimConfigs",
+        FolderName = "MattyHubConfigs",
         FileName = "Default"
     },
-    DisableRayfieldPrompts = true
 })
 
--- ===================== Build Tabs & UI =====================
-
--- MAIN TAB
+-- Main Tab
 local mainTab = Window:CreateTab("Main", "zap")
 mainTab:CreateSection("Movement & Utility")
 
@@ -295,9 +133,10 @@ local antiAfkToggle = mainTab:CreateToggle({
     Callback = function(on) end
 })
 
--- TELEPORT TAB (button)
+-- Teleport Tab
 local teleportTab = Window:CreateTab("Teleport", "map-pin")
 teleportTab:CreateSection("Teleport Tools")
+
 local function playerListExceptLocal()
     local out = {}
     for _, p in ipairs(Players:GetPlayers()) do
@@ -332,7 +171,7 @@ local tpButton = teleportTab:CreateButton({
 Players.PlayerAdded:Connect(function() tpDropdown:Refresh(playerListExceptLocal()) end)
 Players.PlayerRemoving:Connect(function() tpDropdown:Refresh(playerListExceptLocal()) end)
 
--- FIGHTING TAB
+-- Fighting Tab
 local fightTab = Window:CreateTab("Fighting", "target")
 fightTab:CreateSection("Combat Tools")
 
@@ -376,125 +215,19 @@ local espColorPicker = fightTab:CreateColorPicker({
     Callback = function(color) end
 })
 
--- SETTINGS TAB (themes)
-local settingsTab = Window:CreateTab("Settings", "sliders")
-settingsTab:CreateSection("Theme Selector")
-local themeOptions = {
-    "Default - Default",
-    "Amber Glow - AmberGlow",
-    "Amethyst - Amethyst",
-    "Bloom - Bloom",
-    "Dark Blue - DarkBlue",
-    "Green - Green",
-    "Light - Light",
-    "Ocean - Ocean",
-    "Serenity - Serenity"
-}
--- Dropdown shows user-friendly strings; we'll parse identifier after selection
-local themeDropdown = settingsTab:CreateDropdown({
-    Name = "Theme - Name (Identifier)",
-    Options = themeOptions,
-    CurrentOption = {"Default - Default"},
-    MultipleOptions = false,
-    Flag = "ThemeDropdown",
-    Callback = function(opt)
-        -- parse identifier after " - "
-        local sel = opt and opt[1] or "Default - Default"
-        local id = sel:match("%-%s*(%S+)%s*$") or "Default"
-        -- safety: map some names -> identifiers (strip spaces)
-        id = id:gsub("%s+", "")
-        -- try to apply
-        local applied = applyThemeByIdentifier(id, Window)
-        -- save selection to config (Rayfield flags)
-        pcall(function() Rayfield.Flags.LastThemeSelected:Set(sel) end)
-        if applied then
-            Rayfield:Notify({Title="Theme", Content="Applied theme: "..sel, Duration=2})
-        else
-            Rayfield:Notify({Title="Theme", Content="Theme set; reopen UI if it did not apply.", Duration=3})
-        end
-    end
-})
--- add a hidden flag so selection is persisted
-settingsTab:CreateLabel("Select a theme to apply. Selection is saved.", 0, nil, false)
--- create a persistent flag to hold last selection (so config saving stores it)
-local _ = Window:CreateToggle({
-    Name = "LastThemeSelected",
-    CurrentValue = false,
-    Flag = "LastThemeSelected",
-    Callback = function() end
-})
-
--- KEYBINDS TAB
+-- Keybinds Tab
 local keybindsTab = Window:CreateTab("Keybinds", "keyboard")
 keybindsTab:CreateSection("Keybinds")
 
-local function toggleFlagByName(flagName)
-    local f = Rayfield.Flags[flagName]
-    if f then
-        local val = f.Value
-        f:Set(not val)
-    end
-end
-
--- Create the keybinds requested
-local kb_speed = keybindsTab:CreateKeybind({
-    Name = "Toggle Speed",
-    CurrentKeybind = "F",
-    HoldToInteract = false,
-    Flag = "KB_Speed",
-    Callback = function(held) if not held then toggleFlagByName("SpeedToggle") end end
-})
-local kb_jp = keybindsTab:CreateKeybind({
-    Name = "Toggle JumpPower",
-    CurrentKeybind = "G",
-    HoldToInteract = false,
-    Flag = "KB_Jump",
-    Callback = function(held) if not held then toggleFlagByName("JumpToggle") end end
-})
-local kb_infjump = keybindsTab:CreateKeybind({
-    Name = "Toggle Infinite Jump",
-    CurrentKeybind = "H",
-    HoldToInteract = false,
-    Flag = "KB_InfJump",
-    Callback = function(held) if not held then toggleFlagByName("InfJump") end end
-})
-local kb_noclip = keybindsTab:CreateKeybind({
-    Name = "Toggle Noclip",
-    CurrentKeybind = "J",
-    HoldToInteract = false,
-    Flag = "KB_Noclip",
-    Callback = function(held) if not held then toggleFlagByName("Noclip") end end
-})
-local kb_esp = keybindsTab:CreateKeybind({
-    Name = "Toggle ESP",
-    CurrentKeybind = "U",
-    HoldToInteract = false,
-    Flag = "KB_ESP",
-    Callback = function(held) if not held then toggleFlagByName("ESPToggle") end end
-})
 local kb_aim = keybindsTab:CreateKeybind({
-    Name = "Aimbot (nearest while held)",
+    Name = "Toggle Nearest Aimbot",
     CurrentKeybind = "I",
-    HoldToInteract = true,
+    HoldToInteract = false,
     Flag = "KB_AimNearest",
-    Callback = function(held) aimingKeyHeld = held end
+    Callback = function(held)
+        if not held then aimingKeyToggled = not aimingKeyToggled end
+    end
 })
-local kb_infhealth = keybindsTab:CreateKeybind({
-    Name = "Toggle Infinite Health",
-    CurrentKeybind = "Y",
-    HoldToInteract = false,
-    Flag = "KB_InfHealth",
-    Callback = function(held) if not held then toggleFlagByName("InfiniteHealth") end end
-})
-local kb_antiafk = keybindsTab:CreateKeybind({
-    Name = "Toggle Anti-AFK",
-    CurrentKeybind = "O",
-    HoldToInteract = false,
-    Flag = "KB_AntiAFK",
-    Callback = function(held) if not held then toggleFlagByName("AntiAFK") end end
-})
-
--- ===================== Backend Logic =====================
 
 -- Infinite jump
 UserInputService.JumpRequest:Connect(function()
@@ -504,7 +237,7 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
--- Noclip loop
+-- Noclip
 RunService.Stepped:Connect(function()
     if noclipToggle and noclipToggle.CurrentValue then
         local char = getCharacter()
@@ -524,7 +257,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Anti-AFK: small camera nudge every 55s
+-- Anti-AFK
 spawn(function()
     while true do
         if antiAfkToggle and antiAfkToggle.CurrentValue then
@@ -532,24 +265,23 @@ spawn(function()
             if cam then
                 local old = cam.CFrame
                 cam.CFrame = old * CFrame.new(0,0.0001,0)
-                wait(0.12)
+                task.wait(0.12)
                 if cam then cam.CFrame = old end
             end
         end
-        wait(55)
+        task.wait(55)
     end
 end)
 
--- ===================== ESP: Highlight + Name =====================
-local espTracks = {} -- player -> {highlight = instance, billboard = instance}
-
+-- ESP
+local espTracks = {}
 local function createNameBillboard(p)
     if not p.Character then return nil end
     local root = getHRP(p.Character)
     if not root then return nil end
 
     local billboard = Instance.new("BillboardGui")
-    billboard.Name = "HackerName"
+    billboard.Name = "MattyESPName"
     billboard.Adornee = root
     billboard.AlwaysOnTop = true
     billboard.Size = UDim2.new(0,150,0,30)
@@ -575,7 +307,7 @@ local function applyESP(p)
     if not p.Character then return end
 
     local hl = Instance.new("Highlight")
-    hl.Name = "HackerHighlight"
+    hl.Name = "MattyESPHighlight"
     hl.Adornee = p.Character
     hl.FillTransparency = 0.6
     hl.OutlineTransparency = 0.6
@@ -625,26 +357,7 @@ Players.PlayerRemoving:Connect(function(p)
     aimbotTargetDropdown:Refresh(currentPlayerNames())
 end)
 
--- Ensure existing players get ESP if enabled
-if espToggle and espToggle.CurrentValue then
-    for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then applyESP(p) end end
-end
-
--- ===================== AIMBOT (fixed) =====================
--- right mouse hold -> aimingMouseDown; keybind hold -> aimingKeyHeld (already handled by keybind)
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        aimingMouseDown = true
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        aimingMouseDown = false
-    end
-end)
-
--- helper: nearest to screen center
+-- Aimbot Logic
 local function findNearestPlayerToScreenCenter()
     local cam = workspace.CurrentCamera
     if not cam then return nil end
@@ -675,21 +388,12 @@ RunService.Heartbeat:Connect(function(dt)
     if not workspace.CurrentCamera then return end
     local cam = workspace.CurrentCamera
 
-    -- Determine if we should aim:
-    -- - If Aimbot toggle ON and right mouse held -> aim at selected player (if any)
-    -- - If aimbot keybind held (aimingKeyHeld true) -> aim at nearest
+    local shouldAimNearest = aimingKeyToggled
     local shouldAimWithDropdown = (aimbotToggle and aimbotToggle.CurrentValue and aimingMouseDown)
-    local shouldAimNearest = aimingKeyHeld
 
-    if not shouldAimWithDropdown and not shouldAimNearest then return end
+    if not shouldAimNearest and not shouldAimWithDropdown then return end
 
-    local targetPlayer = nil
-    if shouldAimNearest then
-        targetPlayer = findNearestPlayerToScreenCenter()
-    else
-        targetPlayer = getAimbotDropdownPlayer()
-    end
-
+    local targetPlayer = shouldAimNearest and findNearestPlayerToScreenCenter() or getAimbotDropdownPlayer()
     if targetPlayer and targetPlayer.Character then
         local targetPart = targetPlayer.Character:FindFirstChild("Head") or getHRP(targetPlayer.Character)
         if targetPart then
@@ -699,33 +403,12 @@ RunService.Heartbeat:Connect(function(dt)
     end
 end)
 
--- ===================== Finalize: Load saved config & set initial theme if present =====================
--- If user previously saved a theme string, try to load it from the saved flags.
--- Rayfield saves flags into config; attempt reading LastThemeSelected flag we used earlier.
+-- Load saved configuration
 Rayfield:LoadConfiguration()
 
--- After loading config, attempt to read persisted theme selection
-local persistedTheme = nil
-pcall(function()
-    -- We stored selection as the toggle "LastThemeSelected" content earlier; but flag storage varies by Rayfield version.
-    if Rayfield.Flags and Rayfield.Flags.LastThemeSelected then
-        local raw = Rayfield.Flags.LastThemeSelected.Value
-        if type(raw) == "string" and raw:match("%-") then
-            persistedTheme = raw:match("%-%s*(%S+)%s*$")
-        end
-    end
-end)
-if persistedTheme then
-    persistedTheme = persistedTheme:gsub("%s+", "")
-    local applied = applyThemeByIdentifier(persistedTheme, Window)
-    if applied then
-        Rayfield:Notify({Title="Theme", Content="Loaded theme: "..tostring(persistedTheme), Duration=2})
-    end
-end
-
--- Friendly startup notification
+-- Startup notification
 Rayfield:Notify({
-    Title = "Hacking Sim Loaded",
-    Content = "Local simulator ready. Use in Studio/test places only.",
+    Title = "Matty Hub Loaded",
+    Content = "All features are ready!",
     Duration = 4
 })
