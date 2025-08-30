@@ -172,33 +172,47 @@ local antiAfkToggle = mainTab:CreateToggle({
 })
 
 -- -------------------
--- Teleport Tab: Teleport Tool (Click to teleport)
+-- Teleport Tab: Teleport Player Dropdown + Button
 -- -------------------
 local teleportTab = Window:CreateTab("Teleport", "map-pin")
 teleportTab:CreateSection("Teleport Tools")
 
-local tpButton = teleportTab:CreateButton({
-    Name = "Activate Teleport Tool",
-    Callback = function()
-        -- Give player the teleport tool
-        local tool = Instance.new("Tool")
-        tool.Name = "Teleporter"
-        tool.RequiresHandle = true
-        local handle = Instance.new("Part")
-        handle.Size = Vector3.new(1, 1, 1)
-        handle.Name = "Handle"
-        handle.Anchored = true
-        handle.CanCollide = false
-        handle.Parent = tool
-        tool.Parent = LocalPlayer.Backpack
+-- Dropdown for selecting player to teleport
+local function playerListExceptLocal()
+    local out = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then table.insert(out, p.Name) end
+    end
+    if #out == 0 then table.insert(out, "No Players") end
+    return out
+end
 
-        -- When tool is equipped, teleport to the click position
-        tool.Activated:Connect(function()
-            local mouse = LocalPlayer:GetMouse()
-            local targetPosition = mouse.Hit.p
-            LocalPlayer.Character:WaitForChild("HumanoidRootPart").CFrame = CFrame.new(targetPosition)
-            Rayfield:Notify({Title = "Teleport", Content = "Teleported to clicked location.", Duration = 3})
-        end)
+local tpDropdown = teleportTab:CreateDropdown({
+    Name = "Teleport Target",
+    Options = playerListExceptLocal(),
+    CurrentOption = {},
+    MultipleOptions = false,
+    Flag = "TeleportDropdown",
+    Callback = function() end
+})
+
+-- Button to teleport to selected player
+local tpButton = teleportTab:CreateButton({
+    Name = "Teleport To Player",
+    Callback = function()
+        local opt = tpDropdown.CurrentOption and tpDropdown.CurrentOption[1]
+        if not opt or opt == "No Players" then 
+            Rayfield:Notify({Title="Teleport", Content="No target selected.", Duration=3})
+            return 
+        end
+        local target = Players:FindFirstChild(opt)
+        if target and target.Character and getHRP(target.Character) and getHRP(getCharacter()) then
+            local hrp = getHRP(getCharacter())
+            hrp.CFrame = getHRP(target.Character).CFrame + Vector3.new(0, 3, 0)
+            Rayfield:Notify({Title="Teleport", Content="Teleported to "..opt, Duration=2})
+        else
+            Rayfield:Notify({Title="Teleport", Content="Target unavailable (maybe respawning).", Duration=3})
+        end
     end
 })
 
@@ -401,24 +415,4 @@ end)
 Players.PlayerRemoving:Connect(function(p)
     tpDropdown:Refresh(playerListExceptLocal())
     aimbotTargetDropdown:Refresh(currentPlayerNames())
-    removeESP(p)
-    -- clear aimbot selection if it was the removed player
-    local sel = aimbotTargetDropdown.CurrentOption and aimbotTargetDropdown.CurrentOption[1]
-    if sel and sel == p.Name then
-        clearAimbotSelection()
-        if aimbotToggle and aimbotToggle.CurrentValue then
-            aimbotToggle:Set(false)
-            Rayfield:Notify({Title="Aimbot", Content="Target left — aimbot disabled", Duration=2})
-        end
-    end
-end)
-
--- -------------------
--- Finish: Load prefs and notify
--- -------------------
-Rayfield:LoadConfiguration()
-Rayfield:Notify({
-    Title = "Matty Hub Loaded",
-    Content = "Main features ready. Use the UI to toggle features.",
-    Duration = 4
-})
+    remove
