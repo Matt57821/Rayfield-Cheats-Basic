@@ -76,7 +76,7 @@ local function getHRP(character)
 end
 
 -- -------------------
--- Main Tab (everything lives here)
+-- Main Tab: Movement & Utility
 -- -------------------
 local mainTab = Window:CreateTab("Main", "zap")
 mainTab:CreateSection("Movement & Utility")
@@ -165,8 +165,12 @@ local antiAfkToggle = mainTab:CreateToggle({
     Callback = function(on) end
 })
 
--- Teleport (simple)
-local teleportSection = mainTab:CreateSection("Teleport")
+-- -------------------
+-- Teleport Tab: Teleportation
+-- -------------------
+local teleportTab = Window:CreateTab("Teleport", "map-pin")
+teleportTab:CreateSection("Teleport Tools")
+
 local function playerListExceptLocal()
     local out = {}
     for _, p in ipairs(Players:GetPlayers()) do
@@ -175,7 +179,7 @@ local function playerListExceptLocal()
     if #out == 0 then table.insert(out, "No Players") end
     return out
 end
-local tpDropdown = mainTab:CreateDropdown({
+local tpDropdown = teleportTab:CreateDropdown({
     Name = "Teleport Target",
     Options = playerListExceptLocal(),
     CurrentOption = {},
@@ -183,7 +187,7 @@ local tpDropdown = mainTab:CreateDropdown({
     Flag = "TeleportDropdown",
     Callback = function() end
 })
-local tpButton = mainTab:CreateButton({
+local tpButton = teleportTab:CreateButton({
     Name = "Teleport To Player",
     Callback = function()
         local opt = tpDropdown.CurrentOption and tpDropdown.CurrentOption[1]
@@ -199,15 +203,18 @@ local tpButton = mainTab:CreateButton({
     end
 })
 
--- Fighting / Aimbot + ESP
-mainTab:CreateSection("Combat Tools")
+-- -------------------
+-- Fighting Tab: Aimbot & ESP
+-- -------------------
+local fightTab = Window:CreateTab("Fighting", "target")
+fightTab:CreateSection("Combat Tools")
 
-local aimbotToggle = mainTab:CreateToggle({
+-- Aimbot
+local aimbotToggle = fightTab:CreateToggle({
     Name = "Aimbot (toggle) - locks dropdown player",
     CurrentValue = false,
     Flag = "AimbotToggle",
     Callback = function(on)
-        -- when on, we will start aiming at the dropdown-selected player in RunService loop
         if on then
             Rayfield:Notify({Title="Aimbot", Content="Aimbot enabled (dropdown target)", Duration=2})
         else
@@ -225,7 +232,7 @@ local function currentPlayerNames()
     return names
 end
 
-local aimbotTargetDropdown = mainTab:CreateDropdown({
+local aimbotTargetDropdown = fightTab:CreateDropdown({
     Name = "Aimbot Target Player",
     Options = currentPlayerNames(),
     CurrentOption = {},
@@ -234,15 +241,8 @@ local aimbotTargetDropdown = mainTab:CreateDropdown({
     Callback = function() end
 })
 
--- Reset dropdown selection safely
-local function clearAimbotSelection()
-    if aimbotTargetDropdown then
-        pcall(function() aimbotTargetDropdown:Set({}) end)
-    end
-end
-
--- ESP toggles + color
-local espToggle = mainTab:CreateToggle({
+-- ESP
+local espToggle = fightTab:CreateToggle({
     Name = "ESP (Highlight + Name)",
     CurrentValue = false,
     Flag = "ESPToggle",
@@ -263,7 +263,7 @@ local espToggle = mainTab:CreateToggle({
     end
 })
 
-local espColorPicker = mainTab:CreateColorPicker({
+local espColorPicker = fightTab:CreateColorPicker({
     Name = "ESP Color",
     Color = Color3.fromRGB(255,0,0),
     Flag = "ESPColor",
@@ -313,7 +313,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Anti-AFK: small camera nudge every 55s
+-- Anti-AFK
 spawn(function()
     while true do
         if antiAfkToggle and antiAfkToggle.CurrentValue then
@@ -410,48 +410,6 @@ Players.PlayerRemoving:Connect(function(p)
         if aimbotToggle and aimbotToggle.CurrentValue then
             aimbotToggle:Set(false)
             Rayfield:Notify({Title="Aimbot", Content="Target left — aimbot disabled", Duration=2})
-        end
-    end
-end)
-
--- Ensure existing players get ESP if enabled
-if espToggle and espToggle.CurrentValue then
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then applyESP(p) end
-    end
-end
-
--- -------------------
--- Aimbot Implementation (client-side camera lerp)
--- -------------------
-local function getAimbotDropdownPlayer()
-    local opt = aimbotTargetDropdown.CurrentOption and aimbotTargetDropdown.CurrentOption[1]
-    if not opt or opt == "No Players" or opt == "" then return nil end
-    return Players:FindFirstChild(opt)
-end
-
-RunService.Heartbeat:Connect(function(dt)
-    if not Workspace.CurrentCamera then return end
-    local cam = Workspace.CurrentCamera
-
-    local shouldAim = aimbotToggle and aimbotToggle.CurrentValue
-    if not shouldAim then return end
-
-    local targetPlayer = getAimbotDropdownPlayer()
-    if not targetPlayer then
-        -- try to gracefully disable aimbot if no valid dropdown target
-        if aimbotToggle and aimbotToggle.CurrentValue then
-            aimbotToggle:Set(false)
-            Rayfield:Notify({Title="Aimbot", Content="No valid target selected — aimbot disabled", Duration=2})
-        end
-        return
-    end
-
-    if targetPlayer and targetPlayer.Character then
-        local targetPart = targetPlayer.Character:FindFirstChild("Head") or getHRP(targetPlayer.Character)
-        if targetPart then
-            local desired = CFrame.new(cam.CFrame.Position, targetPart.Position)
-            cam.CFrame = cam.CFrame:Lerp(desired, math.clamp(10 * dt, 0, 1))
         end
     end
 end)
