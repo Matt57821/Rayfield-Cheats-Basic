@@ -12,7 +12,7 @@ local ok, Rayfield = pcall(function()
     return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 end)
 if not ok or not Rayfield then
-    warn("Matty Hub: Failed to load Rayfield. Enable HTTP or embed Rayfield locally.")
+    warn("Matty Hub: Failed to load Rayfield.")
     return
 end
 
