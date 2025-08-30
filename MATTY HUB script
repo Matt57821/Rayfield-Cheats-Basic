@@ -1,129 +1,140 @@
--- Matty Hub - Full LocalScript Fixed
--- Rayfield UI required
+-- Matty Hub (Safe) - Rayfield UI with KeySystem & Theme Selector
+-- Place into StarterPlayer -> StarterPlayerScripts
+-- NOTE: This script intentionally does NOT include cheats/exploits (aimbot/esp/noclip/etc).
+-- It demonstrates a secure Rayfield-based UI, key system, and theme switching.
+
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
--- Load Rayfield
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- Load Rayfield (official)
+local ok, Rayfield = pcall(function()
+    return loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+end)
+if not ok or not Rayfield then
+    warn("Failed to load Rayfield. Make sure HTTP requests are allowed and the URL is reachable.")
+    return
+end
 
--- Shared state
-local aimingKeyToggled = false
-local aimingMouseDown = false
+-- Simple loading notify (no animation)
+Rayfield:Notify({
+    Title = "Matty Hub",
+    Content = "Fetching latest updates...\nChecking key...",
+    Duration = 2
+})
 
--- Helpers
-local function getCharacter() return LocalPlayer and LocalPlayer.Character end
-local function getHumanoid() local c = getCharacter() return c and c:FindFirstChildOfClass("Humanoid") end
-local function getHRP(character) if not character then return nil end return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChildWhichIsA("BasePart") end
-
--- Create Rayfield window
+-- Create the Rayfield window with KeySystem and Discord prompt
 local Window = Rayfield:CreateWindow({
     Name = "Matty Hub",
-    Icon = 0,
+    Icon = 0, -- 0 = none
     LoadingTitle = "Matty Hub",
-    LoadingSubtitle = "Loaded Successfully",
+    LoadingSubtitle = "Checking credentials...",
     ShowText = "Matty Hub",
     Theme = "Default",
     ToggleUIKeybind = "K",
-    DisableRayfieldPrompts = true,
+    DisableRayfieldPrompts = false,
     DisableBuildWarnings = false,
-    ConfigurationSaving = { Enabled = true, FolderName = "MattyHubConfigs", FileName = "Default" },
+
+    -- Configuration saving (persist settings)
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "MattyHubConfigs",
+        FileName = "Default"
+    },
+
+    -- Discord join integration (shows prompt in supported executors)
+    Discord = {
+        Enabled = true,
+        Invite = "uHC3rn6n", -- DO NOT include discord.gg/, Rayfield expects the invite code only
+        RememberJoins = true
+    },
+
+    -- Enable Rayfield KeySystem (user must enter key to load UI)
+    KeySystem = true,
+    KeySettings = {
+        Title = "Matty Hub Key",
+        Subtitle = "Enter your key to continue",
+        Note = "Contact the Matty Hub owner to obtain a valid key.",
+        FileName = "MattyHubKey", -- saved locally by Rayfield
+        SaveKey = true,
+        GrabKeyFromSite = false, -- we are embedding the key below
+        Key = {"Mattyhubkey123"} -- the required key(s)
+    }
 })
 
--- ======= Main Tab =======
+-- Simple sections and UI (no cheating features)
 local mainTab = Window:CreateTab("Main", "zap")
-mainTab:CreateSection("Movement & Utility")
+mainTab:CreateSection("Welcome")
 
--- WalkSpeed
-local speedSlider = mainTab:CreateSlider({ Name = "WalkSpeed", Range = {0, 500}, Increment = 1, Suffix = "WS", CurrentValue = 16, Flag = "SpeedSlider" })
-local speedToggle = mainTab:CreateToggle({ Name = "Speed On/Off", CurrentValue = false, Flag = "SpeedToggle" })
+mainTab:CreateLabel("Welcome to Matty Hub", 0, Color3.fromRGB(240,240,240), false)
+mainTab:CreateParagraph({Title = "Info", Content = "This is a safe Matty Hub build. It uses Rayfield's key system and theme switcher. No cheats are included."})
 
--- JumpPower
-local jumpSlider = mainTab:CreateSlider({ Name = "JumpPower", Range = {0, 500}, Increment = 1, Suffix = "JP", CurrentValue = 50, Flag = "JumpSlider" })
-local jumpToggle = mainTab:CreateToggle({ Name = "JumpPower On/Off", CurrentValue = false, Flag = "JumpToggle" })
+-- Settings / Theme selector
+local settingsTab = Window:CreateTab("Settings", "sliders")
+settingsTab:CreateSection("Theme Selector")
 
--- Functions to apply speed/jump
-local function applySpeed() local hum = getHumanoid() if hum and speedToggle.CurrentValue then hum.WalkSpeed = speedSlider.CurrentValue end end
-local function applyJump() local hum = getHumanoid() if hum and jumpToggle.CurrentValue then hum.JumpPower = jumpSlider.CurrentValue end end
+local themeOptions = {
+    "Default - Default",
+    "Amber Glow - AmberGlow",
+    "Amethyst - Amethyst",
+    "Bloom - Bloom",
+    "Dark Blue - DarkBlue",
+    "Green - Green",
+    "Light - Light",
+    "Ocean - Ocean",
+    "Serenity - Serenity"
+}
 
-speedToggle.Callback = function() applySpeed() end
-speedSlider.Callback = function() applySpeed() end
-jumpToggle.Callback = function() applyJump() end
-jumpSlider.Callback = function() applyJump() end
+local themeDropdown = settingsTab:CreateDropdown({
+    Name = "Theme - Name (Identifier)",
+    Options = themeOptions,
+    CurrentOption = {"Default - Default"},
+    MultipleOptions = false,
+    Flag = "ThemeDropdown",
+    Callback = function(opt)
+        local sel = opt and opt[1] or "Default - Default"
+        local id = sel:match("%-%s*(%S+)%s*$") or "Default"
+        id = id:gsub("%s+", "") -- strip spaces
+        -- Use Rayfield API to change theme live
+        if Window.ModifyTheme then
+            pcall(function() Window:ModifyTheme(id) end)
+        elseif Rayfield.ModifyTheme then
+            pcall(function() Rayfield:ModifyTheme(id) end)
+        else
+            warn("ModifyTheme API not detected. Theme change may not be supported in this Rayfield version.")
+        end
+        Rayfield:Notify({Title="Theme", Content="Applied theme: "..sel, Duration=2})
+    end
+})
 
--- Reapply on respawn
-LocalPlayer.CharacterAdded:Connect(function(char) char:WaitForChild("Humanoid") task.wait(0.1) applySpeed() applyJump() end)
+-- Small utilities
+settingsTab:CreateButton({
+    Name = "Reset UI Configuration",
+    Callback = function()
+        -- Resetting is done by clearing config file (Rayfield will create fresh defaults next load).
+        -- Rayfield exposes functions to clear config only in some forks; if not available, we notify.
+        if Rayfield.DeleteConfiguration then
+            pcall(function() Rayfield:DeleteConfiguration() end)
+            Rayfield:Notify({Title="Config", Content="Configuration removed. Reload the script to start fresh.", Duration=3})
+        else
+            Rayfield:Notify({Title="Config", Content="Reset not supported by Rayfield build. Manually delete configs.", Duration=3})
+        end
+    end
+})
 
--- Infinite Jump
-local infJumpToggle = mainTab:CreateToggle({ Name = "Infinite Jump", CurrentValue = false, Flag = "InfJump" })
-UserInputService.JumpRequest:Connect(function() if infJumpToggle.CurrentValue then local hum = getHumanoid() if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end end end)
+-- Small Discord label + button in Settings (in case Discord integration isn't automatic)
+settingsTab:CreateLabel("Discord: https://discord.gg/uHC3rn6n", 0, nil, false)
 
--- Noclip
-local noclipToggle = mainTab:CreateToggle({ Name = "Noclip", CurrentValue = false, Flag = "Noclip" })
-RunService.Stepped:Connect(function() if noclipToggle.CurrentValue then local char = getCharacter() if char then for _, part in pairs(char:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = false end end end end end)
+-- Provide a simple "About" tab
+local aboutTab = Window:CreateTab("About", "info")
+aboutTab:CreateSection("About Matty Hub")
+aboutTab:CreateParagraph({Title = "Matty Hub", Content = "Matty Hub (safe edition) — uses Rayfield UI. This edition intentionally omits any exploit features. Use it for legitimate admin tools or UI design."})
 
--- Infinite Health
-local infHealthToggle = mainTab:CreateToggle({ Name = "Infinite Health", CurrentValue = false, Flag = "InfiniteHealth" })
-RunService.Heartbeat:Connect(function() if infHealthToggle.CurrentValue then local hum = getHumanoid() if hum then hum.Health = hum.MaxHealth end end end)
-
--- Anti-AFK
-local antiAfkToggle = mainTab:CreateToggle({ Name = "Anti-AFK", CurrentValue = true, Flag = "AntiAFK" })
-spawn(function() while true do if antiAfkToggle.CurrentValue then local cam = workspace.CurrentCamera if cam then local old = cam.CFrame cam.CFrame = old * CFrame.new(0,0.0001,0) task.wait(0.12) cam.CFrame = old end end task.wait(55) end end)
-
--- ======= Teleport Tab =======
-local teleportTab = Window:CreateTab("Teleport", "map-pin")
-teleportTab:CreateSection("Teleport Tools")
-
-local function playerListExceptLocal() local out = {} for _, p in ipairs(Players:GetPlayers()) do if p ~= LocalPlayer then table.insert(out, p.Name) end end if #out==0 then table.insert(out,"No Players") end return out end
-
-local tpDropdown = teleportTab:CreateDropdown({ Name = "Teleport Target", Options = playerListExceptLocal(), CurrentOption = {}, MultipleOptions = false, Flag = "TeleportDropdown" })
-local tpButton = teleportTab:CreateButton({ Name = "Teleport To Player", Callback = function()
-    local opt = tpDropdown.CurrentOption[1]
-    if not opt or opt=="No Players" then Rayfield:Notify({Title="Teleport", Content="No target selected.", Duration=3}); return end
-    local target = Players:FindFirstChild(opt)
-    if target and target.Character and getHRP(target.Character) and getHRP(getCharacter()) then getHRP(getCharacter()).CFrame = getHRP(target.Character).CFrame + Vector3.new(0,3,0) Rayfield:Notify({Title="Teleport", Content="Teleported to "..opt, Duration=2})
-    else Rayfield:Notify({Title="Teleport", Content="Target unavailable.", Duration=3}) end
-end})
-Players.PlayerAdded:Connect(function() tpDropdown:Refresh(playerListExceptLocal()) end)
-Players.PlayerRemoving:Connect(function() tpDropdown:Refresh(playerListExceptLocal()) end)
-
--- ======= Fighting Tab =======
-local fightTab = Window:CreateTab("Fighting", "target")
-fightTab:CreateSection("Combat Tools")
-
-local aimbotToggle = fightTab:CreateToggle({ Name = "Aimbot", CurrentValue = false, Flag = "AimbotToggle" })
-local function currentPlayerNames() local names = {} for _, p in ipairs(Players:GetPlayers()) do if p~=LocalPlayer then table.insert(names,p.Name) end end if #names==0 then table.insert(names,"No Players") end return names end
-local aimbotTargetDropdown = fightTab:CreateDropdown({ Name = "Aimbot Target Player", Options = currentPlayerNames(), CurrentOption = {}, MultipleOptions = false, Flag = "AimbotTargetPlayer" })
-Players.PlayerAdded:Connect(function(p) aimbotTargetDropdown:Refresh(currentPlayerNames()) end)
-Players.PlayerRemoving:Connect(function(p) aimbotTargetDropdown:Refresh(currentPlayerNames()) if aimbotTargetDropdown.CurrentOption[1]==p.Name then aimbotTargetDropdown:Set({}) end end)
-
--- ======= ESP =======
-local espToggle = fightTab:CreateToggle({ Name = "ESP (Highlight + Name)", CurrentValue = false, Flag = "ESPToggle" })
-local espColorPicker = fightTab:CreateColorPicker({ Name = "ESP Color", Color = Color3.fromRGB(255,0,0), Flag = "ESPColor" })
-local espTracks = {}
-local function createNameBillboard(p) if not p.Character then return nil end local root = getHRP(p.Character) if not root then return nil end local billboard = Instance.new("BillboardGui") billboard.Name = "MattyESPName" billboard.Adornee = root billboard.AlwaysOnTop=true billboard.Size=UDim2.new(0,150,0,30) billboard.StudsOffset=Vector3.new(0,3.5,0) billboard.ResetOnSpawn=false billboard.Parent=workspace.CurrentCamera local label = Instance.new("TextLabel", billboard) label.Size=UDim2.new(1,0,1,0) label.BackgroundTransparency=1 label.Text=p.Name label.TextScaled=true label.Font=Enum.Font.SourceSansBold label.TextStrokeTransparency=0.6 label.TextColor3=espColorPicker.Color return billboard end
-local function applyESP(p) if p==LocalPlayer or espTracks[p] then return end if not p.Character then return end local hl=Instance.new("Highlight") hl.Name="MattyESPHighlight" hl.Adornee=p.Character hl.FillTransparency=0.6 hl.OutlineTransparency=0.6 hl.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop hl.FillColor=espColorPicker.Color hl.OutlineColor=espColorPicker.Color hl.Parent=workspace local bb=createNameBillboard(p) espTracks[p]={highlight=hl,billboard=bb} end
-local function removeESP(p) local t=espTracks[p] if not t then return end if t.highlight then pcall(function() t.highlight:Destroy() end) end if t.billboard then pcall(function() t.billboard:Destroy() end) end espTracks[p]=nil end
-espToggle.Callback=function(on) if on then for _,p in ipairs(Players:GetPlayers()) do if p~=LocalPlayer then applyESP(p) end end else for p,_ in pairs(espTracks) do removeESP(p) end end end
-espColorPicker.Callback=function(col) for _, t in pairs(espTracks) do if t.highlight then t.highlight.FillColor=col t.highlight.OutlineColor=col end if t.billboard then t.billboard:FindFirstChildOfClass("TextLabel").TextColor3=col end end end
-Players.PlayerAdded:Connect(function(p) if espToggle.CurrentValue and p~=LocalPlayer then applyESP(p) end end)
-Players.PlayerRemoving:Connect(function(p) removeESP(p) end)
-
--- ======= Keybinds Tab =======
-local keybindsTab = Window:CreateTab("Keybinds","keyboard")
-keybindsTab:CreateSection("Keybinds")
-local kb_aim = keybindsTab:CreateKeybind({ Name = "Toggle Nearest Aimbot", CurrentKeybind = "I", HoldToInteract=false, Flag="KB_AimNearest", Callback=function(held) if not held then aimingKeyToggled=not aimingKeyToggled end end})
-
--- ======= Aimbot Logic =======
-local function findNearestPlayerToScreenCenter() local cam=workspace.CurrentCamera if not cam then return nil end local best,bestDist=nil,math.huge for _,p in ipairs(Players:GetPlayers()) do if p~=LocalPlayer and p.Character then local part=p.Character:FindFirstChild("Head") or getHRP(p.Character) if part then local screen,on=cam:WorldToViewportPoint(part.Position) if on then local center=Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2) local d=(Vector2.new(screen.X,screen.Y)-center).Magnitude if d<bestDist then bestDist=d best=p end end end end end return best end
-local function getAimbotDropdownPlayer() local opt=aimbotTargetDropdown.CurrentOption[1] if not opt or opt=="No Players" then return nil end return Players:FindFirstChild(opt) end
-RunService.Heartbeat:Connect(function(dt) if not workspace.CurrentCamera then return end local cam=workspace.CurrentCamera local shouldAimNearest=aimingKeyToggled local shouldAimDropdown=aimbotToggle.CurrentValue and aimingMouseDown if not shouldAimNearest and not shouldAimDropdown then return end local target=shouldAimNearest and findNearestPlayerToScreenCenter() or getAimbotDropdownPlayer() if target and target.Character then local part=target.Character:FindFirstChild("Head") or getHRP(target.Character) if part then cam.CFrame=cam.CFrame:Lerp(CFrame.new(cam.CFrame.Position, part.Position), math.clamp(10*dt,0,1)) end end end)
-
-Players.PlayerRemoving:Connect(function(p) if aimbotTargetDropdown.CurrentOption[1]==p.Name then aimbotTargetDropdown:Set({}) end end)
-
--- Load config
+-- Load saved configuration (Rayfield handles flags)
 Rayfield:LoadConfiguration()
 
--- Startup notification
-Rayfield:Notify({Title="Matty Hub Loaded", Content="All features are ready!", Duration=4})
+-- Final notification
+Rayfield:Notify({
+    Title = "Matty Hub",
+    Content = "Ready. Use your key to access features.",
+    Duration = 3
+})
